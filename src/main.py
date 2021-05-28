@@ -1,6 +1,33 @@
 import argparse
 
+import cv2
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as lda
+
 from FileManager import FileManager
+from ImageTrainClass import ImageTrainClass
+
+
+def processData(trainImagesList):
+    for trainImage in trainImagesList:
+        image = ImageTrainClass.__getattribute__(trainImage, 'img')
+        image_grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        equalize_image = cv2.equalizeHist(image_grey)
+        resized_image = cv2.resize(equalize_image, (30, 30), interpolation=cv2.INTER_AREA)
+        cell_size = (4, 4)  # h x w in pixels
+        block_size = (2, 2)  # h x w in cells
+        nbins = 9  # number of orientation bins
+
+        hog = cv2.HOGDescriptor(_winSize=(resized_image.shape[1] // cell_size[1] * cell_size[1],
+                                          resized_image.shape[0] // cell_size[0] * cell_size[0]),
+                                _blockSize=(block_size[1] * cell_size[1],
+                                            block_size[0] * cell_size[0]),
+                                _blockStride=(cell_size[1], cell_size[0]),
+                                _cellSize=(cell_size[1], cell_size[0]),
+                                _nbins=nbins)
+        descriptor = hog.compute(resized_image)
+        ImageTrainClass.__setattr__(trainImage, 'vector_caract', descriptor)
+
+
 
 if __name__ == "__main__":
 
@@ -18,9 +45,10 @@ if __name__ == "__main__":
     # Cargar los datos de entrenamiento
     fileManager = FileManager()
     numberTrainDirectories = fileManager.countNumberOfFiles(args.train_path)
-    trainDirectoriesArray = fileManager.generateDirectoriesList(args.train_path, numberTrainDirectories)
+    trainImagesList = fileManager.generateImagesList(args.train_path, numberTrainDirectories)
 
     #Tratamiento de los datos
+    processData(trainImagesList)
 
     # Crear el clasificador 
     if args.classifier == "BAYES":

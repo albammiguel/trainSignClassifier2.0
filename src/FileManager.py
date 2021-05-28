@@ -1,6 +1,9 @@
 import os
 import cv2
 
+from ImageTrainClass import ImageTrainClass
+
+
 class FileManager:
 
     #método que cuenta el número de archivos/carpetas que hay en un directorio.
@@ -9,12 +12,23 @@ class FileManager:
         print("Numero de archivos: " + str(len(listPath)))
         return len(listPath)
 
-    def generateDirectoriesList(self, path, numberTrainDirectories):
+    def generateImagesList(self, path, numberTrainDirectories):
 
-        trainDirectoriesArray = [0] * numberTrainDirectories
+        trainImagesList = []
         for i in range(numberTrainDirectories):
-            trainDirectoriesArray[i] = path + "\\" + ('%02d' % i)
-            print("Guardado nombre directorio: " + trainDirectoriesArray[i])
+            signClass = ('%02d' % i)
+            pathCurrentDirectory = path + "\\" + signClass
+            imagesDirectory = os.listdir(pathCurrentDirectory)
+            print("----Directorio  " + signClass + "-------")
+            for image in imagesDirectory:
+                print("Readed image " + pathCurrentDirectory+"\\"+image)
+                img = cv2.imread(pathCurrentDirectory+"\\"+image)
+                imageTrain = ImageTrainClass(img, signClass)
+                trainImagesList.append(imageTrain)
 
-        return trainDirectoriesArray
+
+        return trainImagesList
+
+
+
 
