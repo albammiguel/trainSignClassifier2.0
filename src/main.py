@@ -1,31 +1,71 @@
 import argparse
 
 import cv2
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as lda
+import numpy
+from sklearn.discriminant_analysis import  LinearDiscriminantAnalysis
 
 from FileManager import FileManager
 from ImageTrainClass import ImageTrainClass
 
 
+def processImage(image):
+    image_grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    equalize_image = cv2.equalizeHist(image_grey)
+    resized_image = cv2.resize(equalize_image, (30, 30), interpolation=cv2.INTER_AREA)
+
+    return resized_image
+
+#Parte del siguiente código está extraído de la siguiente página:
+#https://cristianrohr.github.io/datascience/python/machine%20learning/im%C3%A1genes/deteccion-peatones/
 def processData(trainImagesList):
+
+    trainingData = numpy.array([])
+    classes = numpy.array([])
+
     for trainImage in trainImagesList:
-        image = ImageTrainClass.__getattribute__(trainImage, 'img')
-        image_grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        equalize_image = cv2.equalizeHist(image_grey)
-        resized_image = cv2.resize(equalize_image, (30, 30), interpolation=cv2.INTER_AREA)
-        cell_size = (4, 4)  # h x w in pixels
-        block_size = (2, 2)  # h x w in cells
+        processedImage = processImage(ImageTrainClass.__getattribute__(trainImage, 'img'))
+        cell_size = (5, 5)  # h x w in pixels
+        block_size = (3, 3)  # h x w in cells
         nbins = 9  # number of orientation bins
 
-        hog = cv2.HOGDescriptor(_winSize=(resized_image.shape[1] // cell_size[1] * cell_size[1],
-                                          resized_image.shape[0] // cell_size[0] * cell_size[0]),
+        hog = cv2.HOGDescriptor(_winSize=(processedImage.shape[1] // cell_size[1] * cell_size[1],
+                                          processedImage.shape[0] // cell_size[0] * cell_size[0]),
                                 _blockSize=(block_size[1] * cell_size[1],
                                             block_size[0] * cell_size[0]),
                                 _blockStride=(cell_size[1], cell_size[0]),
                                 _cellSize=(cell_size[1], cell_size[0]),
                                 _nbins=nbins)
-        descriptor = hog.compute(resized_image)
-        ImageTrainClass.__setattr__(trainImage, 'vector_caract', descriptor)
+
+        v = hog.compute(processedImage)
+        v2 = v.ravel()
+        ImageTrainClass.__setattr__(trainImage, 'vector_caract', v2)
+        trainingData = numpy.hstack((trainingData, v2))
+        classes = numpy.hstack((classes, numpy.array(ImageTrainClass.__getattribute__(trainImage, 'signClass'))))
+
+    trainingData = trainingData.reshape((len(trainImagesList), len(v2)))
+
+    return trainingData, classes
+
+
+def test(imagen, clasificador):
+
+    img = cv2.imread(imagen, cv2.IMREAD_COLOR)
+    processedImage = processImage(img)
+    cell_size = (5, 5)  # h x w in pixels
+    block_size = (3, 3)  # h x w in cells
+    nbins = 9  # number of orientation bins
+
+    hog = cv2.HOGDescriptor(_winSize=(processedImage.shape[1] // cell_size[1] * cell_size[1],
+                                      processedImage.shape[0] // cell_size[0] * cell_size[0]),
+                            _blockSize=(block_size[1] * cell_size[1],
+                                        block_size[0] * cell_size[0]),
+                            _blockStride=(cell_size[1], cell_size[0]),
+                            _cellSize=(cell_size[1], cell_size[0]),
+                            _nbins=nbins)
+
+    v = hog.compute(processedImage)
+    h2 = v.reshape((1, -1))
+    return (clasificador.predict(h2))
 
 
 
@@ -48,9 +88,17 @@ if __name__ == "__main__":
     trainImagesList = fileManager.generateImagesList(args.train_path, numberTrainDirectories)
 
     #Tratamiento de los datos
-    processData(trainImagesList)
+    trainingData, classesList = processData(trainImagesList)
 
-    # Crear el clasificador 
+    lda = LinearDiscriminantAnalysis()
+
+    lda.fit(trainingData, classesList)
+
+    EXAMPLE= "C:\\Users\\albam\\Desktop\\URJC\\SEGUNDO_CUATRIMESTRE\\VISION_ARTIFICIAL\\PRACTICA_2\\test_reconocimiento\\38-00012.ppm"
+    res = test(EXAMPLE, lda)
+    print(EXAMPLE, " fue clasificado como: ", res)
+
+    # Crear el clasificador
     if args.classifier == "BAYES":
         #detector = ...
         None
