@@ -1,11 +1,16 @@
 import argparse
+import math
 
 import cv2
+import cv2.ml
 import numpy
-from sklearn.discriminant_analysis import  LinearDiscriminantAnalysis
+from matplotlib import pyplot as plt
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.metrics import classification_report, confusion_matrix, plot_confusion_matrix
 
 from FileManager import FileManager
-from ImageTrainClass import ImageTrainClass
+from ImageClass import ImageClass
+from ImageTestClass import ImageTestClass
 
 
 def processImage(image):
@@ -15,58 +20,46 @@ def processImage(image):
 
     return resized_image
 
-#Parte del siguiente código está extraído de la siguiente página:
-#https://cristianrohr.github.io/datascience/python/machine%20learning/im%C3%A1genes/deteccion-peatones/
-def processData(trainImagesList):
-
-    trainingData = numpy.array([])
-    classes = numpy.array([])
-
-    for trainImage in trainImagesList:
-        processedImage = processImage(ImageTrainClass.__getattribute__(trainImage, 'img'))
-        cell_size = (5, 5)  # h x w in pixels
-        block_size = (3, 3)  # h x w in cells
-        nbins = 9  # number of orientation bins
-
-        hog = cv2.HOGDescriptor(_winSize=(processedImage.shape[1] // cell_size[1] * cell_size[1],
-                                          processedImage.shape[0] // cell_size[0] * cell_size[0]),
-                                _blockSize=(block_size[1] * cell_size[1],
-                                            block_size[0] * cell_size[0]),
-                                _blockStride=(cell_size[1], cell_size[0]),
-                                _cellSize=(cell_size[1], cell_size[0]),
-                                _nbins=nbins)
-
-        v = hog.compute(processedImage)
-        v2 = v.ravel()
-        ImageTrainClass.__setattr__(trainImage, 'vector_caract', v2)
-        trainingData = numpy.hstack((trainingData, v2))
-        classes = numpy.hstack((classes, numpy.array(ImageTrainClass.__getattribute__(trainImage, 'signClass'))))
-
-    trainingData = trainingData.reshape((len(trainImagesList), len(v2)))
-
-    return trainingData, classes
-
-
-def test(imagen, clasificador):
-
-    img = cv2.imread(imagen, cv2.IMREAD_COLOR)
-    processedImage = processImage(img)
+#https://stackoverflow.com/questions/44972099/opencv-hog-features-explanation
+def createHogDescriptor(image):
     cell_size = (5, 5)  # h x w in pixels
     block_size = (3, 3)  # h x w in cells
     nbins = 9  # number of orientation bins
 
-    hog = cv2.HOGDescriptor(_winSize=(processedImage.shape[1] // cell_size[1] * cell_size[1],
-                                      processedImage.shape[0] // cell_size[0] * cell_size[0]),
+    hog = cv2.HOGDescriptor(_winSize=(image.shape[1] // cell_size[1] * cell_size[1],
+                                      image.shape[0] // cell_size[0] * cell_size[0]),
                             _blockSize=(block_size[1] * cell_size[1],
                                         block_size[0] * cell_size[0]),
                             _blockStride=(cell_size[1], cell_size[0]),
                             _cellSize=(cell_size[1], cell_size[0]),
                             _nbins=nbins)
 
-    v = hog.compute(processedImage)
-    h2 = v.reshape((1, -1))
-    return (clasificador.predict(h2))
+    return hog
 
+#Parte del siguiente código está extraído de la siguiente página:
+#https://cristianrohr.github.io/datascience/python/machine%20learning/im%C3%A1genes/deteccion-peatones/
+def processData(imagesList):
+
+    data = numpy.array([])
+    classes = numpy.array([])
+
+    for image in imagesList:
+        processedImage = processImage(ImageClass.__getattribute__(image, 'img'))
+        hog = createHogDescriptor(processedImage)
+        v = hog.compute(processedImage)
+        v2 = v.ravel()
+        ImageClass.__setattr__(image, 'vector_caract', v2)
+        data = numpy.hstack((data, v2))
+        classes = numpy.hstack((classes, numpy.array(ImageClass.__getattribute__(image, 'signClass'))))
+
+    data = data.reshape((len(imagesList), len(v2)))
+
+    return data, classes
+
+
+def savePredictedLabels(testImagesList, predictedClasses):
+    for i in range(len(testImagesList)):
+        ImageTestClass.__setattr__(testImagesList[i], 'predictedSignClass', predictedClasses[i])
 
 
 if __name__ == "__main__":
@@ -90,29 +83,43 @@ if __name__ == "__main__":
     #Tratamiento de los datos
     trainingData, classesList = processData(trainImagesList)
 
-    lda = LinearDiscriminantAnalysis()
-
-    lda.fit(trainingData, classesList)
-
-    EXAMPLE= "C:\\Users\\albam\\Desktop\\URJC\\SEGUNDO_CUATRIMESTRE\\VISION_ARTIFICIAL\\PRACTICA_2\\test_reconocimiento\\38-00012.ppm"
-    res = test(EXAMPLE, lda)
-    print(EXAMPLE, " fue clasificado como: ", res)
 
     # Crear el clasificador
     if args.classifier == "BAYES":
-        #detector = ...
-        None
+        detector = LinearDiscriminantAnalysis()
     else:
         raise ValueError('Tipo de clasificador incorrecto')
 
     # Entrenar el clasificador si es necesario ...
-    # detector ...
+    detector.fit(trainingData, classesList)
 
-    # Cargar y procesar imgs de test 
-    # args.train_path ...
+
+    # Cargar y procesar imgs de test
+    testImagesList = fileManager.generateImagesTestList(args.test_path)
 
     # Guardar los resultados en ficheros de texto (en el directorio donde se 
     # ejecuta el main.py) tal y como se pide en el enunciado.
+    testData, realClasses = processData(testImagesList)
+
+    predictedClasses = detector.predict(testData)
+
+    savePredictedLabels(testImagesList, predictedClasses)
+    fileManager.generateResultFile("resultado.txt", testImagesList)
+
+
+    print(classification_report(realClasses, predictedClasses))
+
+
+    tasa_acierto = numpy.sum(1*(realClasses == predictedClasses))/realClasses.shape[0]
+    print("La tasa de acierto es: ", format(tasa_acierto*100, ".2f"), "%")
+
+
+
+    fig, ax = plt.subplots(figsize=(40, 40))
+    plot_confusion_matrix(detector, testData, realClasses, cmap=plt.cm.Blues, ax=ax)
+    plt.title('Matriz de confusion clasificador Bayes sklearn')
+    plt.show()
+
 
 
 
