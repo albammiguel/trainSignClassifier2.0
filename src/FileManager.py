@@ -13,6 +13,7 @@ class FileManager:
         print("Numero de archivos: " + str(len(listPath)))
         return len(listPath)
 
+    #metodo que guarda las imagenes de train en sus respectivos objetos Imagen.
     def generateImagesList(self, path, numberTrainDirectories):
 
         trainImagesList = []
@@ -30,6 +31,7 @@ class FileManager:
 
         return trainImagesList
 
+    #metodo que guarda las imagenes de test en sus respectivos objetos Imagen.
     def generateImagesTestList(self, path):
 
         testImagesList = []
@@ -45,9 +47,9 @@ class FileManager:
 
         return testImagesList
 
+    #generar el fichero .txt con los resultados
     def generateResultFile(self, path, testImagesList):
             f = open(path, "w")
-
             for testImage in testImagesList:
                 img_name = ImageTestClass.__getattribute__(testImage,'imgName')
                 img_name = img_name.replace("-", "_")

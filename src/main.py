@@ -42,7 +42,7 @@ def createHogDescriptor(image):
 #Parte del siguiente código está extraído de la siguiente página:
 #https://cristianrohr.github.io/datascience/python/machine%20learning/im%C3%A1genes/deteccion-peatones/
 def processData(imagesList):
-
+    print("Procesando datos, procesando la imagen y calculando array de vectores de características con HOG...")
     data = numpy.array([])
     classes = numpy.array([])
 
@@ -85,8 +85,6 @@ def calculateCrossValidation(detector, totalData, totalClasses):
 
 
 
-
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
@@ -112,8 +110,8 @@ if __name__ == "__main__":
 
     # Crear el clasificador
     if args.classifier[1] == "BAYES":
-        #detector = cv2.ml.NormalBayesClassifier_create()
         detector = LinearDiscriminantAnalysis()
+        #detector = cv2.ml.NormalBayesClassifier_create()
     elif args.classifier[1] == "EUCLIDEAN":
         detector = NearestCentroid(metric='euclidean')
     elif args.classifier[1] == "KNN":
@@ -127,15 +125,17 @@ if __name__ == "__main__":
             lda = LinearDiscriminantAnalysis()
             lda.fit(trainingData, classesList)
             trainingData = lda.transform(trainingData)
-        """
+
+        """"--- Si utilizamos el clasificador bayesiano de OpenCV no habría que diferenciar con el segundo if.---
         lda = LinearDiscriminantAnalysis()
         lda.fit(trainingData, classesList)
         trainingData = lda.transform(trainingData)"""
-
     elif args.classifier[0] == "PCA":
         pca = PCA()
         pca.fit(trainingData, classesList)
         trainingData = pca.transform(trainingData)
+
+    print("Array de vectores de características reducido:", trainingData)
 
     detector.fit(trainingData, classesList)
     #detector.train(numpy.float32(trainingData), cv2.ml.ROW_SAMPLE, numpy.int32(classesList))
@@ -144,40 +144,47 @@ if __name__ == "__main__":
     # Cargar y procesar imgs de test
     testImagesList = fileManager.generateImagesTestList(args.test_path)
 
-    # Guardar los resultados en ficheros de texto (en el directorio donde se 
-    # ejecuta el main.py) tal y como se pide en el enunciado.
     testData, realClasses = processData(testImagesList)
-
 
     if args.classifier[0] == "LDA":
         if args.classifier[1] != "BAYES":
             testData = lda.transform(testData)
-
-        #testData = lda.transform(testData)
-
+        """"--- Si utilizamos el clasificador bayesiano de OpenCV no habría que diferenciar con el segundo if.---
+        testData = lda.transform(testData)"""
     elif args.classifier[0] == "PCA":
         testData = pca.transform(testData)
 
 
     predictedClasses = detector.predict(testData)
+    #Código del clasificador bayesiano de OpenCV
     #_, predictedClasses = detector.predict(numpy.float32(testData))
+    #predictedClassesString = predictedClasses.astype(str)
+    print("Clases reales de los datos de test:", realClasses)
+    print("Clases predecidas por el clasificador de los datos de test:", predictedClasses)
 
+
+    # Guardar los resultados en ficheros de texto (en el directorio donde se 
+    # ejecuta el main.py) tal y como se pide en el enunciado.
     savePredictedLabels(testImagesList, predictedClasses)
+    # savePredictedLabels(testImagesList, predictedClassesString)
     fileManager.generateResultFile("resultado.txt", testImagesList)
 
+
+    #-----Generación de datos y graficas de analisis.-----
     #realClasses = numpy.int32(realClasses)
-    print(classification_report(realClasses, predictedClasses))
+    print(classification_report(realClasses, predictedClasses, zero_division=0))
 
     #Tasa de acierto
+    tasa_acierto = numpy.sum(1*(realClasses == predictedClasses))/realClasses.shape[0]
     """tasa_acierto = numpy.sum(1 * (realClasses.reshape((realClasses.shape[0], 1)) == predictedClasses)) / \
                    realClasses.shape[0]"""
-    tasa_acierto = numpy.sum(1*(realClasses == predictedClasses))/realClasses.shape[0]
     print("La tasa de acierto es: ", format(tasa_acierto*100, ".2f"), "%")
 
 
     #Matríz de confusion
-    #cfm = confusion_matrix(realClasses, predictedClasses)
     printConfussionMatrix(detector, testData, realClasses)
+    #cfm = confusion_matrix(realClasses, predictedClasses)
+    #print(cfm)
 
 
     #validacionCruzada
